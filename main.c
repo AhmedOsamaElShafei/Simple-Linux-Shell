@@ -23,7 +23,7 @@ char * modified_getline(){
     int readbytes;
     size_t size = 16;
     char *inputstring;
-    puts("please enter a string");
+    puts("please enter your command");
     inputstring = (char*) malloc(size);
     readbytes = getline(&inputstring, &size, stdin);
 
@@ -59,10 +59,22 @@ char** get_arguments (char* inputstring){
     return strings;
 }
 
+//  signal handler
+
+void signalHandler(int signal)
+{
+    printf("Cought signal %d!\n",signal);
+    if (signal==SIGCHLD) {
+        puts("Child ended");
+        return;
+    }
+}
+
 // OS Stuff
 // main function of execution and dealing with parent and child
 
 int execute(char** strings) {
+
     pid_t pid, waitpid;
 
     // before forking we check for reserved words to execute
@@ -80,28 +92,32 @@ int execute(char** strings) {
     }
 
     else if (strcmp(strings[0], reserved_commands[2]) == 0){    // if input was rm we remove the file if
-        remove(strings[1]);                             // there was any of the same name
+        execvp(strings[0],strings);                            // there was any of the same name
         return 0;
     }
 
+    pid = fork();       // here we fork to generate a child
 
-        pid = fork();       // here we fork to generate a child
+    if (!pid) {         // in child mode we execute other programs
+        if (execvp(strings[0], strings) == -1)
+            perror("myshell");
 
-        if (!pid) {         // in child mode we execute other programs
-            if (execvp(strings[0], strings) == -1)
-                perror("myshell");
+        if (strcmp(strings[0], reserved_commands[0]) == 0){     // checking for ls family commands to execute in child mode
+            execvp(strings[0],strings);
+        }
 
-            if (strcmp(strings[0], reserved_commands[0]) == 0){     // checking for ls family commands to execute in child mode
-                execvp(strings[0],strings);
-            }
-
-        } else if (pid > 0) {       // parent mode checking if there is '&' to wait or not
-            if (strcmp(strings[argc - 1], "&") == 0)
-                return 0;
-            else
-                waitpid = wait(NULL);       // there is '&' so we wait for child to terminate
-        } else
-            perror("myshell");          // error while forking
+    } else if (pid > 0) {       // parent mode checking if there is '&' to wait or not
+        if (strcmp(strings[0], reserved_commands[0]) == 0) {
+            usleep(100000);     // sleep to wait for signal
+            return 0;
+        }
+        signal(SIGCHLD, signalHandler);     // catching signal of terminated child
+        if (strcmp(strings[argc - 1], "&") == 0)
+            return 0;
+        else
+            waitpid = wait(NULL);       // there is '&' so we wait for child to terminate
+    } else
+        perror("myshell");          // error while forking
 }
 
 int main() {
