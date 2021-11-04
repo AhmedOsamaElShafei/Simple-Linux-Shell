@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-
-int argc; // global variable to count the arguments inserted by user
+FILE* file;     // log file
+int argc;       // global variable to count the arguments inserted by user
 
 char* reserved_commands[4] = {
         "ls",       // array of strings for built in commands
@@ -63,9 +63,9 @@ char** get_arguments (char* inputstring){
 
 void signalHandler(int signal)
 {
-    printf("Cought signal %d!\n",signal);
+    fprintf(file,"Cought signal %d!\n",signal);
     if (signal==SIGCHLD) {
-        puts("Child ended");
+        fprintf(file,"Child ended\n\n");
         return;
     }
 }
@@ -87,12 +87,7 @@ int execute(char** strings) {
         exit(EXIT_SUCCESS);
 
     else if (strcmp(strings[0], reserved_commands[1]) == 0){    // if input was cd we change the directory
-            chdir(strings[1]);
-            return 0;
-    }
-
-    else if (strcmp(strings[0], reserved_commands[2]) == 0){    // if input was rm we remove the file if
-        execvp(strings[0],strings);                            // there was any of the same name
+        chdir(strings[1]);
         return 0;
     }
 
@@ -106,11 +101,12 @@ int execute(char** strings) {
             execvp(strings[0],strings);
         }
 
-    } else if (pid > 0) {       // parent mode checking if there is '&' to wait or not
-        if (strcmp(strings[0], reserved_commands[0]) == 0) {
-            usleep(100000);     // sleep to wait for signal
+        else if (strcmp(strings[0], reserved_commands[2]) == 0){    // if input was rm we remove the file if
+            execvp(strings[0],strings);                            // there was any of the same name
             return 0;
         }
+
+    } else if (pid > 0) {       // parent mode checking if there is '&' to wait or not
         signal(SIGCHLD, signalHandler);     // catching signal of terminated child
         if (strcmp(strings[argc - 1], "&") == 0)
             return 0;
@@ -121,7 +117,7 @@ int execute(char** strings) {
 }
 
 int main() {
-
+    file = fopen("logs.txt", "a");
     while (1){          // infinite loop until we recieve exit call
         char* x = modified_getline();   // prompting line input
         char** strings = get_arguments(x);      // storing arguments in an array of strings
